@@ -7,3 +7,11 @@ edition = "2018"
 
 [dependencies]
 anyhow = "1"
+criterion = "0.3.4"
+
+[profile.bench]
+debug = true
+
+[[bench]]
+name = "sorts"
+harness = false

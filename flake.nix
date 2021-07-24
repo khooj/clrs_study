@@ -14,7 +14,7 @@
   outputs = { self, nixpkgs, rust-overlay, flake-utils, ... }:
     let
       myapp = "poe-system";
-      rust-version = "1.53.0";
+      rust-version = "1.51.0";
     in flake-utils.lib.eachDefaultSystem (system:
       let
         overlays = [
@@ -43,6 +43,7 @@
           python3
           jq
           nixos-shell
+          linuxPackages.perf
         ];
         nativeBuildInputs = with pkgs; [ rustc cargo pkgconfig nixpkgs-fmt ];
 
