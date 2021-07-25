@@ -28,6 +28,17 @@ pub fn insertion_sorts_benchmark(c: &mut Criterion) {
                 });
             },
         );
+
+        group.bench_with_input(
+            BenchmarkId::new("selection_sort", format!("{:?}", input)),
+            input,
+            |b, i| {
+                b.iter(|| {
+                    let mut i = i.clone();
+                    selection_sort(i.as_mut());
+                });
+            },
+        );
     }
 }
 

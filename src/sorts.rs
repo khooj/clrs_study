@@ -44,9 +44,30 @@ pub fn insertion_sort2(a: &mut [i32]) {
     }
 }
 
+/// 2.2-2
+pub fn selection_sort(a: &mut [i32]) {
+    for j in 0..a.len()-1 {
+        let (idx, m) = a[j..a.len()].iter().enumerate()
+            .min_by_key(|(_, &el)| el).unwrap();
+        if idx == 0 {
+            continue
+        }
+        let k = a[j];
+        a[j] = *m;
+        a[idx+j] = k;
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn selection_sort_check() {
+        let mut a = vec![5, 2, 4, 6, 1, 3];
+        selection_sort(&mut a);
+        assert_eq!(a, &[1, 2, 3, 4, 5, 6]);
+    }
 
     #[test]
     fn insert_sort_check() {
