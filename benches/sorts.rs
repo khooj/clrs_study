@@ -1,6 +1,13 @@
 use clrs_study::sorts::*;
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 
+static LARGE_TEST_SAMPLE: once_cell::sync::Lazy<Vec<i32>> = once_cell::sync::Lazy::new(|| {
+    (0..10_000)
+        .into_iter()
+        .map(|_| rand::random::<i32>())
+        .collect()
+});
+
 pub fn insertion_sorts_benchmark(c: &mut Criterion) {
     let mut group = c.benchmark_group("insertion sort");
 
@@ -28,19 +35,86 @@ pub fn insertion_sorts_benchmark(c: &mut Criterion) {
                 });
             },
         );
+    }
+}
 
+pub fn merge_sorts_benchmark(c: &mut Criterion) {
+    let mut group = c.benchmark_group("merge sort");
+
+    // TODO: somehow eluminate array copying without sort rewriting
+    for input in [[6, 5, 4, 3, 2, 1], [1, 2, 3, 4, 5, 6]].iter() {
         group.bench_with_input(
-            BenchmarkId::new("selection_sort", format!("{:?}", input)),
+            BenchmarkId::new("merge_sort", format!("{:?}", input)),
             input,
             |b, i| {
                 b.iter(|| {
                     let mut i = i.clone();
-                    selection_sort(i.as_mut());
+                    MergeSort::merge_sort(i.as_mut());
+                });
+            },
+        );
+
+        group.bench_with_input(
+            BenchmarkId::new("merge_sort2", format!("{:?}", input)),
+            input,
+            |b, i| {
+                b.iter(|| {
+                    let mut i = i.clone();
+                    MergeSort2::merge_sort(i.as_mut());
                 });
             },
         );
     }
 }
 
-criterion_group!(benches, insertion_sorts_benchmark);
-criterion_main!(benches);
+pub fn large_test_sample_benchmark(c: &mut Criterion) {
+    let mut group = c.benchmark_group("large_sample_sorts");
+
+    group.bench_function("merge_sort", |b| {
+        b.iter(|| {
+            let mut l = LARGE_TEST_SAMPLE.clone();
+            MergeSort::merge_sort(l.as_mut());
+        });
+    });
+
+    group.bench_function("merge_sort2", |b| {
+        b.iter(|| {
+            let mut l = LARGE_TEST_SAMPLE.clone();
+            MergeSort2::merge_sort(l.as_mut());
+        });
+    });
+
+    group.bench_function("insert_sort", |b| {
+        b.iter(|| {
+            let mut l = LARGE_TEST_SAMPLE.clone();
+            insert_sort(l.as_mut());
+        });
+    });
+
+    group.bench_function("insert_sort2", |b| {
+        b.iter(|| {
+            let mut l = LARGE_TEST_SAMPLE.clone();
+            insertion_sort2(l.as_mut());
+        });
+    });
+}
+
+pub fn selection_sort_bench(c: &mut Criterion) {
+    c.bench_function("selection_sort", |b| {
+        b.iter(|| {
+            let mut a = vec![6, 5, 4, 3, 2, 1];
+            selection_sort(&mut a);
+        })
+    });
+}
+
+criterion_group!(insertion_sorts, insertion_sorts_benchmark);
+criterion_group!(selection_sorts, selection_sort_bench);
+criterion_group!(merge_sorts, merge_sorts_benchmark);
+criterion_group!(large_sample_sorts, large_test_sample_benchmark);
+criterion_main!(
+    insertion_sorts,
+    selection_sorts,
+    merge_sorts,
+    large_sample_sorts
+);
