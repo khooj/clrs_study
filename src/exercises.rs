@@ -88,18 +88,92 @@ pub fn two_sum(a: &[i32], x: i32) -> Option<(usize, usize)> {
     if a.is_empty() {
         return None;
     }
-    for i in 0..a.len()-1 {
+    for i in 0..a.len() - 1 {
         let y = a[i];
-        if let Some(k) = binary_search(a, x-y) {
+        if let Some(k) = binary_search(a, x - y) {
             return Some((i, k));
         }
     }
     None
 }
 
+/// 2.4 d
+pub struct Inversions;
+
+use super::sorts::IntSentinelGreater;
+
+type IntSentinel = IntSentinelGreater;
+
+impl Inversions {
+    fn count(sub: &mut [i32], l: Vec<i32>, r: Vec<i32>) -> usize {
+        // println!("merge target: {:?} with l: {:?} and r: {:?}", sub, l, r);
+        let l = l
+            .into_iter()
+            .map(|e| IntSentinel::Int(e))
+            .chain(std::iter::once(IntSentinel::Guard))
+            .collect::<Vec<_>>();
+        let r = r
+            .into_iter()
+            .map(|e| IntSentinel::Int(e))
+            .chain(std::iter::once(IntSentinel::Guard))
+            .collect::<Vec<_>>();
+        let mut count = 0usize;
+
+        let mut i = l.iter().peekable();
+        let mut j = r.iter().peekable();
+        let mut k = sub.iter_mut();
+
+        while let Some(k) = k.next() {
+            let i_val = i.peek().unwrap();
+            let j_val = j.peek().unwrap();
+
+            if **i_val > **j_val {
+                *k = i_val.int();
+                i.next();
+                count += j.len()-1;
+            } else {
+                *k = j_val.int();
+                j.next();
+            }
+        }
+        // println!("target result: {:?} with count: {}", sub, count);
+        count
+    }
+
+    fn merge_priv(a: &mut [i32], p: usize, r: usize) -> usize {
+        // println!(
+        //     "run merge_sort_priv: {:?} {} {}",
+        //     a[p..r].iter().collect::<Vec<_>>(),
+        //     p,
+        //     r
+        // );
+        if p + 1 < r {
+            let q = (r + p) / 2;
+            let aa = Inversions::merge_priv(a, p, q);
+            let b = Inversions::merge_priv(a, q, r);
+            let l = a[p..q].into();
+            let rr = a[q..r].into();
+            return Inversions::count(&mut a[p..r], l, rr) + aa + b;
+        }
+        0usize
+    }
+
+    pub fn merge_sort(a: &mut [i32]) -> usize {
+        Inversions::merge_priv(a, 0, a.len())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn inversions_count_check() {
+        let mut a = vec![4, 3, 2, 1];
+        assert_eq!(Inversions::merge_sort(&mut a), 6);
+        let mut a = vec![2, 3, 8, 6, 1];
+        assert_eq!(Inversions::merge_sort(&mut a), 5);
+    }
 
     #[test]
     fn two_sum_check() {

@@ -139,13 +139,14 @@ impl MergeSort {
     }
 }
 
-enum IntSentinel {
+pub enum IntSentinel<T> {
     Int(i32),
     Guard,
+    __data(PhantomData<T>)
 }
 
-impl IntSentinel {
-    fn int(&self) -> i32 {
+impl<T> IntSentinel<T> {
+    pub fn int(&self) -> i32 {
         if let IntSentinel::Int(a) = self {
             *a
         } else {
@@ -154,8 +155,8 @@ impl IntSentinel {
     }
 }
 
-impl PartialEq for IntSentinel {
-    fn eq(&self, other: &IntSentinel) -> bool {
+impl<T> PartialEq for IntSentinel<T> {
+    fn eq(&self, other: &IntSentinel<T>) -> bool {
         if let IntSentinel::Int(a) = &self {
             if let IntSentinel::Int(b) = &other {
                 return a == b;
@@ -168,19 +169,56 @@ impl PartialEq for IntSentinel {
     }
 }
 
-impl PartialOrd for IntSentinel {
-    fn partial_cmp(&self, other: &IntSentinel) -> Option<std::cmp::Ordering> {
+use std::{cmp::Ordering, marker::PhantomData};
+pub trait Comparer {
+    fn less() -> Ordering;
+    fn greater() -> Ordering;
+}
+
+/// Ascending order
+pub struct Lesser;
+
+impl Comparer for Lesser {
+    fn less() -> Ordering {
+        Ordering::Less
+    }
+    fn greater() -> Ordering {
+        Ordering::Greater
+    }
+}
+
+/// Descending order
+pub struct Greater;
+
+impl Comparer for Greater {
+    fn greater() -> Ordering {
+        Ordering::Less
+    }
+
+    fn less() -> Ordering {
+        Ordering::Greater
+    }
+}
+
+impl<T> PartialOrd for IntSentinel<T>
+where
+    T: Comparer,
+{
+    fn partial_cmp(&self, other: &IntSentinel<T>) -> Option<std::cmp::Ordering> {
         if let IntSentinel::Int(a) = &self {
             if let IntSentinel::Int(b) = &other {
                 return a.partial_cmp(b);
             } else {
-                Some(std::cmp::Ordering::Less)
+                Some(T::less())
             }
         } else {
-            Some(std::cmp::Ordering::Greater)
+            Some(T::greater())
         }
     }
 }
+
+pub type IntSentinelLesser = IntSentinel<Lesser>;
+pub type IntSentinelGreater = IntSentinel<Greater>;
 
 pub struct MergeSort2;
 
@@ -189,12 +227,12 @@ impl MergeSort2 {
         // println!("merge target: {:?} with l: {:?} and r: {:?}", sub, l, r);
         let l = l
             .into_iter()
-            .map(|e| IntSentinel::Int(e))
+            .map(|e| IntSentinelLesser::Int(e))
             .chain(std::iter::once(IntSentinel::Guard))
             .collect::<Vec<_>>();
         let r = r
             .into_iter()
-            .map(|e| IntSentinel::Int(e))
+            .map(|e| IntSentinelLesser::Int(e))
             .chain(std::iter::once(IntSentinel::Guard))
             .collect::<Vec<_>>();
 
@@ -248,12 +286,12 @@ impl MergeInsertSort {
         // println!("merge target: {:?} with l: {:?} and r: {:?}", sub, l, r);
         let l = l
             .into_iter()
-            .map(|e| IntSentinel::Int(e))
+            .map(|e| IntSentinelLesser::Int(e))
             .chain(std::iter::once(IntSentinel::Guard))
             .collect::<Vec<_>>();
         let r = r
             .into_iter()
-            .map(|e| IntSentinel::Int(e))
+            .map(|e| IntSentinelLesser::Int(e))
             .chain(std::iter::once(IntSentinel::Guard))
             .collect::<Vec<_>>();
 

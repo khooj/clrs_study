@@ -1,4 +1,4 @@
-use clrs_study::sorts::*;
+use clrs_study::{exercises::Inversions, sorts::*};
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 
 static LARGE_TEST_SAMPLE: once_cell::sync::Lazy<Vec<i32>> = once_cell::sync::Lazy::new(|| {
@@ -130,6 +130,13 @@ pub fn large_test_sample_2_benchmark(c: &mut Criterion) {
                 insert_sort_size: 256,
             }
             .merge_sort(l.as_mut());
+        });
+    });
+
+    group.bench_function("inversions count", |b| {
+        b.iter(|| {
+            let mut l = LARGE_TEST_SAMPLE_2.clone();
+            Inversions::merge_sort(l.as_mut());
         });
     });
 }
