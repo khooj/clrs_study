@@ -139,42 +139,78 @@ impl MergeSort {
     }
 }
 
+enum IntSentinel {
+    Int(i32),
+    Guard,
+}
+
+impl IntSentinel {
+    fn int(&self) -> i32 {
+        if let IntSentinel::Int(a) = self {
+            *a
+        } else {
+            panic!("cant get value from IntSentinel::Guard");
+        }
+    }
+}
+
+impl PartialEq for IntSentinel {
+    fn eq(&self, other: &IntSentinel) -> bool {
+        if let IntSentinel::Int(a) = &self {
+            if let IntSentinel::Int(b) = &other {
+                return a == b;
+            } else {
+                false
+            }
+        } else {
+            false
+        }
+    }
+}
+
+impl PartialOrd for IntSentinel {
+    fn partial_cmp(&self, other: &IntSentinel) -> Option<std::cmp::Ordering> {
+        if let IntSentinel::Int(a) = &self {
+            if let IntSentinel::Int(b) = &other {
+                return a.partial_cmp(b);
+            } else {
+                Some(std::cmp::Ordering::Less)
+            }
+        } else {
+            Some(std::cmp::Ordering::Greater)
+        }
+    }
+}
+
 pub struct MergeSort2;
 
 impl MergeSort2 {
     fn merge(sub: &mut [i32], l: Vec<i32>, r: Vec<i32>) {
         // println!("merge target: {:?} with l: {:?} and r: {:?}", sub, l, r);
-        let l = l.into_iter().map(|e| e).collect::<Vec<_>>();
-        let r = r.into_iter().map(|e| e).collect::<Vec<_>>();
+        let l = l
+            .into_iter()
+            .map(|e| IntSentinel::Int(e))
+            .chain(std::iter::once(IntSentinel::Guard))
+            .collect::<Vec<_>>();
+        let r = r
+            .into_iter()
+            .map(|e| IntSentinel::Int(e))
+            .chain(std::iter::once(IntSentinel::Guard))
+            .collect::<Vec<_>>();
 
         let mut i = l.iter().peekable();
         let mut j = r.iter().peekable();
         let mut k = sub.iter_mut();
 
         while let Some(k) = k.next() {
-            let i_val = i.peek();
-            let j_val = j.peek();
+            let i_val = i.peek().unwrap();
+            let j_val = j.peek().unwrap();
 
-            if i_val.is_some() && j_val.is_some() {
-                let i_val = i_val.unwrap();
-                let j_val = j_val.unwrap();
-
-                if i_val < j_val {
-                    *k = **i_val;
-                    i.next();
-                } else {
-                    *k = **j_val;
-                    j.next();
-                }
-
-                continue;
-            }
-
-            if let Some(v) = i_val {
-                *k = **v;
+            if **i_val < **j_val {
+                *k = i_val.int();
                 i.next();
-            } else if let Some(v) = j_val {
-                *k = **v;
+            } else {
+                *k = j_val.int();
                 j.next();
             }
         }
