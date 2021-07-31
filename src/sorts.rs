@@ -239,6 +239,69 @@ impl MergeSort2 {
     }
 }
 
+pub struct MergeInsertSort {
+    pub insert_sort_size: usize,
+}
+
+impl MergeInsertSort {
+    fn merge(sub: &mut [i32], l: Vec<i32>, r: Vec<i32>) {
+        // println!("merge target: {:?} with l: {:?} and r: {:?}", sub, l, r);
+        let l = l
+            .into_iter()
+            .map(|e| IntSentinel::Int(e))
+            .chain(std::iter::once(IntSentinel::Guard))
+            .collect::<Vec<_>>();
+        let r = r
+            .into_iter()
+            .map(|e| IntSentinel::Int(e))
+            .chain(std::iter::once(IntSentinel::Guard))
+            .collect::<Vec<_>>();
+
+        let mut i = l.iter().peekable();
+        let mut j = r.iter().peekable();
+        let mut k = sub.iter_mut();
+
+        while let Some(k) = k.next() {
+            let i_val = i.peek().unwrap();
+            let j_val = j.peek().unwrap();
+
+            if **i_val < **j_val {
+                *k = i_val.int();
+                i.next();
+            } else {
+                *k = j_val.int();
+                j.next();
+            }
+        }
+        // println!("target result: {:?}", sub);
+    }
+
+    fn merge_priv(&self, a: &mut [i32], p: usize, r: usize) {
+        // println!(
+        //     "run merge_sort_priv: {:?} {} {}",
+        //     a[p..r].iter().collect::<Vec<_>>(),
+        //     p,
+        //     r
+        // );
+        if p + 1 < r {
+            if r - p <= self.insert_sort_size {
+                insertion_sort2(&mut a[p..r]);
+                return;
+            }
+            let q = (r + p) / 2;
+            MergeSort2::merge_priv(a, p, q);
+            MergeSort2::merge_priv(a, q, r);
+            let l = a[p..q].into();
+            let rr = a[q..r].into();
+            MergeSort2::merge(&mut a[p..r], l, rr);
+        }
+    }
+
+    pub fn merge_sort(&self, a: &mut [i32]) {
+        self.merge_priv(a, 0, a.len());
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -278,6 +341,37 @@ mod tests {
 
         let mut a = vec![4, 5, 3, 10, 11];
         MergeSort2::merge_sort(&mut a);
+        assert_eq!(a, &[3, 4, 5, 10, 11]);
+    }
+
+    #[test]
+    fn merge_sort_check3() {
+        let mut a = vec![6, 3];
+        MergeInsertSort {
+            insert_sort_size: 256,
+        }
+        .merge_sort(&mut a);
+        assert_eq!(a, &[3, 6]);
+
+        let mut a = vec![6, 3, 5];
+        MergeInsertSort {
+            insert_sort_size: 256,
+        }
+        .merge_sort(&mut a);
+        assert_eq!(a, &[3, 5, 6]);
+
+        let mut a = vec![6, 3, 5, 4];
+        MergeInsertSort {
+            insert_sort_size: 256,
+        }
+        .merge_sort(&mut a);
+        assert_eq!(a, &[3, 4, 5, 6]);
+
+        let mut a = vec![4, 5, 3, 10, 11];
+        MergeInsertSort {
+            insert_sort_size: 256,
+        }
+        .merge_sort(&mut a);
         assert_eq!(a, &[3, 4, 5, 10, 11]);
     }
 

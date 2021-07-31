@@ -8,6 +8,13 @@ static LARGE_TEST_SAMPLE: once_cell::sync::Lazy<Vec<i32>> = once_cell::sync::Laz
         .collect()
 });
 
+static LARGE_TEST_SAMPLE_2: once_cell::sync::Lazy<Vec<i32>> = once_cell::sync::Lazy::new(|| {
+    (0..1_000_000)
+        .into_iter()
+        .map(|_| rand::random::<i32>())
+        .collect()
+});
+
 pub fn insertion_sorts_benchmark(c: &mut Criterion) {
     let mut group = c.benchmark_group("insertion sort");
 
@@ -99,6 +106,50 @@ pub fn large_test_sample_benchmark(c: &mut Criterion) {
     });
 }
 
+pub fn large_test_sample_2_benchmark(c: &mut Criterion) {
+    let mut group = c.benchmark_group("large_sample_sorts2");
+
+    group.bench_function("merge_sort", |b| {
+        b.iter(|| {
+            let mut l = LARGE_TEST_SAMPLE_2.clone();
+            MergeSort::merge_sort(l.as_mut());
+        });
+    });
+
+    group.bench_function("merge_sort2", |b| {
+        b.iter(|| {
+            let mut l = LARGE_TEST_SAMPLE_2.clone();
+            MergeSort2::merge_sort(l.as_mut());
+        });
+    });
+
+    group.bench_function("merge_insert_sort", |b| {
+        b.iter(|| {
+            let mut l = LARGE_TEST_SAMPLE_2.clone();
+            MergeInsertSort {
+                insert_sort_size: 256,
+            }
+            .merge_sort(l.as_mut());
+        });
+    });
+}
+
+pub fn large_test_sample_2_merge_insert_benchmark(c: &mut Criterion) {
+    let mut group = c.benchmark_group("large_sample_sorts_merge_inserts");
+
+    for i in 8..16 {
+        group.bench_with_input(BenchmarkId::new("merge_insert_sort", &i), &i, |b, i| {
+            b.iter(|| {
+                let mut l = LARGE_TEST_SAMPLE_2.clone();
+                MergeInsertSort {
+                    insert_sort_size: 2usize.pow(*i as u32),
+                }
+                .merge_sort(l.as_mut());
+            });
+        });
+    }
+}
+
 pub fn selection_sort_bench(c: &mut Criterion) {
     c.bench_function("selection_sort", |b| {
         b.iter(|| {
@@ -111,7 +162,12 @@ pub fn selection_sort_bench(c: &mut Criterion) {
 criterion_group!(insertion_sorts, insertion_sorts_benchmark);
 criterion_group!(selection_sorts, selection_sort_bench);
 criterion_group!(merge_sorts, merge_sorts_benchmark);
-criterion_group!(large_sample_sorts, large_test_sample_benchmark);
+criterion_group!(
+    large_sample_sorts,
+    large_test_sample_benchmark,
+    large_test_sample_2_benchmark,
+    large_test_sample_2_merge_insert_benchmark
+);
 criterion_main!(
     insertion_sorts,
     selection_sorts,

@@ -15,7 +15,7 @@ pub fn linear_search<T: Ord>(v: T, a: &[T]) -> Option<usize> {
 }
 
 /// 2.1-4
-/// Given: array `A` with length `N` <a1, a2, ..., an> and array `B` with length N <b1, b2, ..., bn> where every element 
+/// Given: array `A` with length `N` <a1, a2, ..., an> and array `B` with length N <b1, b2, ..., bn> where every element
 /// equals one bit.
 /// Output: array with length `N+1` <c1, c2, ..., c(n+1)> which equals sum of A and B.
 /// cant return `[i8; N+1]` for 1.51
@@ -24,8 +24,8 @@ pub fn sum<const N: usize>(a: [i8; N], b: [i8; N]) -> Vec<i8> {
     // so in case we sum to arrays with zero elements we will return (N+1) == 1 length vec with zeros.
     // Probably I need to emphasize that first element is zero so in case of summation zeros from A and B
     // or values other than zero we will do correct sum.
-    let mut result = Vec::with_capacity(N+1);
-    result.resize(N+1, 0b0);
+    let mut result = Vec::with_capacity(N + 1);
+    result.resize(N + 1, 0b0);
 
     // we assume that every element is 0 or 1
     for ((idx, an), bn) in a.iter().enumerate().zip(b.iter()) {
@@ -34,7 +34,7 @@ pub fn sum<const N: usize>(a: [i8; N], b: [i8; N]) -> Vec<i8> {
         // After we sum everything and and check if we need to move `overvalue` to next index
         // Example corner cases: 0 + 0 + 0 == 0 -> dont move
         // 1 + 1 + 1 == 3 (or 11 in 2-base) -> need to move `1` to next index and write `1` to current index
-        // We calculate moving value as VAL / BASE: 
+        // We calculate moving value as VAL / BASE:
         //      for 0: 0 / 2 == 0
         //      for 3: 3 / 2 == 1
         // and currenct value as VAL % BASE:
@@ -46,15 +46,74 @@ pub fn sum<const N: usize>(a: [i8; N], b: [i8; N]) -> Vec<i8> {
         let t = t % 2;
 
         result[idx] = t;
-        result[idx+1] = m;
+        result[idx + 1] = m;
     }
 
     result
 }
 
+fn abs_sub(a: usize, b: usize) -> usize {
+    if a > b {
+        a - b
+    } else {
+        b - a
+    }
+}
+
+pub fn binary_search(a: &[i32], val: i32) -> Option<usize> {
+    if a.is_empty() {
+        return None;
+    }
+    let mut i = a.len() / 2;
+    let mut i_prev = a.len();
+    while a[i] != val {
+        if a[i] > val {
+            i -= abs_sub(i, i_prev) / 2;
+        } else {
+            i += abs_sub(i, i_prev) / 2;
+        }
+
+        i_prev = i;
+
+        if i == 0 || i == a.len() - 1 {
+            return None;
+        }
+    }
+    Some(i)
+}
+
+/// 2.3-7
+/// should be sorted
+pub fn two_sum(a: &[i32], x: i32) -> Option<(usize, usize)> {
+    if a.is_empty() {
+        return None;
+    }
+    for i in 0..a.len()-1 {
+        let y = a[i];
+        if let Some(k) = binary_search(a, x-y) {
+            return Some((i, k));
+        }
+    }
+    None
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn two_sum_check() {
+        assert_eq!(two_sum(&[], 1), None);
+        assert_eq!(two_sum(&[1, 2, 3, 4, 5], 5), Some((0, 3)));
+    }
+
+    #[test]
+    fn binary_search_test() {
+        assert_eq!(binary_search(&[1, 2, 4, 5, 7, 9, 10], 5), Some(3));
+        assert_eq!(binary_search(&[], 10), None);
+        assert_eq!(binary_search(&[1, 2, 3], 4), None);
+        assert_eq!(binary_search(&[2, 3, 4], 1), None);
+    }
 
     #[test]
     fn linear_search_test() {
