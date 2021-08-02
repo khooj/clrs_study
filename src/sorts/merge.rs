@@ -1,65 +1,5 @@
-/// Doc test check
-/// ```rust
-/// use clrs_study::sorts::insert_sort;
-/// let mut a = vec![3, 2, 1];
-/// insert_sort(&mut a);
-/// assert_eq!(a, &[1, 2, 3]);
-/// ```
-pub fn insert_sort(arr: &mut [i32]) {
-    for j in 1..arr.len() {
-        let k = arr[j];
-        let mut i: i32 = (j as i32) - 1;
-        while i >= 0 && arr[i as usize] > k {
-            arr[(i + 1) as usize] = arr[i as usize];
-            i -= 1;
-        }
-        arr[(i + 1) as usize] = k;
-    }
-}
-
-pub fn insert_sort_decreasing(arr: &mut [i32]) {
-    for j in 1..arr.len() {
-        let k = arr[j];
-        let mut i: i32 = (j as i32) - 1;
-        while i >= 0 && arr[i as usize] < k {
-            arr[(i + 1) as usize] = arr[i as usize];
-            i -= 1;
-        }
-        arr[(i + 1) as usize] = k;
-    }
-}
-
-pub fn insertion_sort2(a: &mut [i32]) {
-    for j in 1..a.len() {
-        let k = a[j];
-        let shift_idx = a[0..j]
-            .iter()
-            .enumerate()
-            .rev()
-            .find(|(_, e)| **e < k)
-            .map(|(idx, _)| idx as i32)
-            .unwrap_or(-1);
-        a.copy_within((shift_idx + 1) as usize..j, (shift_idx + 2) as usize);
-        a[(shift_idx + 1) as usize] = k;
-    }
-}
-
-/// 2.2-2
-pub fn selection_sort(a: &mut [i32]) {
-    for j in 0..a.len() - 1 {
-        let (idx, m) = a[j..a.len()]
-            .iter()
-            .enumerate()
-            .min_by_key(|(_, &el)| el)
-            .unwrap();
-        if idx == 0 {
-            continue;
-        }
-        let k = a[j];
-        a[j] = *m;
-        a[idx + j] = k;
-    }
-}
+use super::insertion_sort2;
+use super::IntSentinelLesser;
 
 pub struct MergeSort;
 
@@ -139,87 +79,6 @@ impl MergeSort {
     }
 }
 
-pub enum IntSentinel<T> {
-    Int(i32),
-    Guard,
-    __data(PhantomData<T>)
-}
-
-impl<T> IntSentinel<T> {
-    pub fn int(&self) -> i32 {
-        if let IntSentinel::Int(a) = self {
-            *a
-        } else {
-            panic!("cant get value from IntSentinel::Guard");
-        }
-    }
-}
-
-impl<T> PartialEq for IntSentinel<T> {
-    fn eq(&self, other: &IntSentinel<T>) -> bool {
-        if let IntSentinel::Int(a) = &self {
-            if let IntSentinel::Int(b) = &other {
-                return a == b;
-            } else {
-                false
-            }
-        } else {
-            false
-        }
-    }
-}
-
-use std::{cmp::Ordering, marker::PhantomData};
-pub trait Comparer {
-    fn less() -> Ordering;
-    fn greater() -> Ordering;
-}
-
-/// Ascending order
-pub struct Lesser;
-
-impl Comparer for Lesser {
-    fn less() -> Ordering {
-        Ordering::Less
-    }
-    fn greater() -> Ordering {
-        Ordering::Greater
-    }
-}
-
-/// Descending order
-pub struct Greater;
-
-impl Comparer for Greater {
-    fn greater() -> Ordering {
-        Ordering::Less
-    }
-
-    fn less() -> Ordering {
-        Ordering::Greater
-    }
-}
-
-impl<T> PartialOrd for IntSentinel<T>
-where
-    T: Comparer,
-{
-    fn partial_cmp(&self, other: &IntSentinel<T>) -> Option<std::cmp::Ordering> {
-        if let IntSentinel::Int(a) = &self {
-            if let IntSentinel::Int(b) = &other {
-                return a.partial_cmp(b);
-            } else {
-                Some(T::less())
-            }
-        } else {
-            Some(T::greater())
-        }
-    }
-}
-
-pub type IntSentinelLesser = IntSentinel<Lesser>;
-pub type IntSentinelGreater = IntSentinel<Greater>;
-
 pub struct MergeSort2;
 
 impl MergeSort2 {
@@ -228,12 +87,12 @@ impl MergeSort2 {
         let l = l
             .into_iter()
             .map(|e| IntSentinelLesser::Int(e))
-            .chain(std::iter::once(IntSentinel::Guard))
+            .chain(std::iter::once(IntSentinelLesser::Guard))
             .collect::<Vec<_>>();
         let r = r
             .into_iter()
             .map(|e| IntSentinelLesser::Int(e))
-            .chain(std::iter::once(IntSentinel::Guard))
+            .chain(std::iter::once(IntSentinelLesser::Guard))
             .collect::<Vec<_>>();
 
         let mut i = l.iter().peekable();
@@ -287,12 +146,12 @@ impl MergeInsertSort {
         let l = l
             .into_iter()
             .map(|e| IntSentinelLesser::Int(e))
-            .chain(std::iter::once(IntSentinel::Guard))
+            .chain(std::iter::once(IntSentinelLesser::Guard))
             .collect::<Vec<_>>();
         let r = r
             .into_iter()
             .map(|e| IntSentinelLesser::Int(e))
-            .chain(std::iter::once(IntSentinel::Guard))
+            .chain(std::iter::once(IntSentinelLesser::Guard))
             .collect::<Vec<_>>();
 
         let mut i = l.iter().peekable();
@@ -327,11 +186,11 @@ impl MergeInsertSort {
                 return;
             }
             let q = (r + p) / 2;
-            MergeSort2::merge_priv(a, p, q);
-            MergeSort2::merge_priv(a, q, r);
+            self.merge_priv(a, p, q);
+            self.merge_priv(a, q, r);
             let l = a[p..q].into();
             let rr = a[q..r].into();
-            MergeSort2::merge(&mut a[p..r], l, rr);
+            MergeInsertSort::merge(&mut a[p..r], l, rr);
         }
     }
 
@@ -411,42 +270,6 @@ mod tests {
         }
         .merge_sort(&mut a);
         assert_eq!(a, &[3, 4, 5, 10, 11]);
-    }
-
-    #[test]
-    fn selection_sort_check() {
-        let mut a = vec![5, 2, 4, 6, 1, 3];
-        selection_sort(&mut a);
-        assert_eq!(a, &[1, 2, 3, 4, 5, 6]);
-    }
-
-    #[test]
-    fn insert_sort_check() {
-        let mut arr = vec![5, 2, 4, 6, 1, 3];
-        insert_sort(&mut arr);
-        assert_eq!(arr, &[1, 2, 3, 4, 5, 6]);
-    }
-
-    #[test]
-    fn insert_sort_decreasing_check() {
-        let mut arr = vec![5, 2, 4, 6, 1, 3];
-        insert_sort_decreasing(&mut arr);
-        assert_eq!(arr, &[6, 5, 4, 3, 2, 1]);
-    }
-
-    #[test]
-    fn insertion_sort2_check() {
-        let mut arr = vec![5, 2, 4, 6, 1, 3];
-        insertion_sort2(&mut arr);
-        assert_eq!(arr, &[1, 2, 3, 4, 5, 6]);
-
-        let mut arr = vec![5];
-        insertion_sort2(&mut arr);
-        assert_eq!(arr, &[5]);
-
-        let mut arr = vec![];
-        insertion_sort2(&mut arr);
-        assert_eq!(arr, &[]);
     }
 
     #[test]

@@ -15,6 +15,13 @@ static LARGE_TEST_SAMPLE_2: once_cell::sync::Lazy<Vec<i32>> = once_cell::sync::L
         .collect()
 });
 
+static LARGE_TEST_SAMPLE_3: once_cell::sync::Lazy<Vec<i32>> = once_cell::sync::Lazy::new(|| {
+    (0..100_000)
+        .into_iter()
+        .map(|_| rand::random::<i32>())
+        .collect()
+});
+
 pub fn insertion_sorts_benchmark(c: &mut Criterion) {
     let mut group = c.benchmark_group("insertion sort");
 
@@ -127,7 +134,7 @@ pub fn large_test_sample_2_benchmark(c: &mut Criterion) {
         b.iter(|| {
             let mut l = LARGE_TEST_SAMPLE_2.clone();
             MergeInsertSort {
-                insert_sort_size: 256,
+                insert_sort_size: 512,
             }
             .merge_sort(l.as_mut());
         });
@@ -147,7 +154,7 @@ pub fn large_test_sample_2_merge_insert_benchmark(c: &mut Criterion) {
     for i in 8..16 {
         group.bench_with_input(BenchmarkId::new("merge_insert_sort", &i), &i, |b, i| {
             b.iter(|| {
-                let mut l = LARGE_TEST_SAMPLE_2.clone();
+                let mut l = LARGE_TEST_SAMPLE_3.clone();
                 MergeInsertSort {
                     insert_sort_size: 2usize.pow(*i as u32),
                 }
