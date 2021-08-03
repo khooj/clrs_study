@@ -1,5 +1,5 @@
 use clrs_study::{exercises::Inversions, sorts::*};
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 
 static LARGE_TEST_SAMPLE: once_cell::sync::Lazy<Vec<i32>> = once_cell::sync::Lazy::new(|| {
     (0..10_000)
