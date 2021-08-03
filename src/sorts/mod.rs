@@ -47,6 +47,14 @@ impl<T> IntSentinel<T> {
             panic!("cant get value from IntSentinel::Guard");
         }
     }
+
+    pub fn is_int(&self) -> bool {
+        if let IntSentinel::Int(_) = &self {
+            true
+        } else {
+            false
+        }
+    }
 }
 
 impl<T> PartialEq for IntSentinel<T> {
@@ -60,6 +68,15 @@ impl<T> PartialEq for IntSentinel<T> {
         } else {
             false
         }
+    }
+}
+
+impl<T> PartialEq<i32> for IntSentinel<T> {
+    fn eq(&self, other: &i32) -> bool {
+        if let IntSentinel::Int(a) = &self {
+            return a == other;
+        }
+        false
     }
 }
 
@@ -107,6 +124,40 @@ where
             }
         } else {
             Some(T::greater())
+        }
+    }
+}
+
+impl<T> PartialOrd<i32> for IntSentinel<T>
+where
+    T: Comparer,
+{
+    fn partial_cmp(&self, other: &i32) -> Option<Ordering> {
+        if let IntSentinel::Int(a) = &self {
+            a.partial_cmp(other)
+        } else {
+            Some(T::less())
+        }
+    }
+}
+
+impl<T> std::ops::Add for IntSentinel<T>
+{
+    type Output = IntSentinel<T>;
+
+    fn add(self, rhs: IntSentinel<T>) -> Self::Output {
+        if let IntSentinel::Int(a) = &self {
+            if let IntSentinel::Int(b) = rhs {
+                IntSentinel::Int(*a + b)
+            } else {
+                self
+            }
+        } else {
+            if rhs.is_int() {
+                rhs
+            } else {
+                IntSentinel::Guard
+            }
         }
     }
 }
