@@ -62,36 +62,33 @@ impl MaxSumSubarray {
     }
 }
 
+/// 4.1-5
 pub fn find_max_subarray(a: &[i32]) -> Option<(usize, usize, i32)> {
     if a.is_empty() {
         return None;
     }
 
-    let mut i = 0;
-    let mut sum = a[i];
-    let mut max_sum = a[i];
-    let mut max_right = 0;
-    let mut max_left = 0;
+    let mut m = IntSentinelLesser::Guard;
+    let mut low_m = 0;
+    let mut high_m = 0;
+    let mut mr = 0;
+    let mut low_r = 0;
 
-    for j in 1..a.len() {
-        sum += a[j];
-
-        if sum >= max_sum {
-            max_sum = sum;
-            max_right = j;
-            max_left = i;
-        } else {
-            sum -= a[i];
-            i += 1;
-            if sum >= max_sum {
-                max_sum = sum;
-                max_right = j;
-                max_left = i;
-            }
+    for i in 0..a.len() {
+        mr += a[i];
+        if m < mr {
+            low_m = low_r;
+            high_m = i;
+            m = IntSentinelLesser::Int(mr);
+        }
+        if mr < 0 {
+            mr = 0;
+            low_r = i + 1;
         }
     }
 
-    Some((max_left, max_right, max_sum))
+
+    Some((low_m, high_m, m.int()))
 }
 
 #[cfg(test)]
@@ -121,5 +118,6 @@ mod tests {
         assert_eq!(find_max_subarray(&[1, 2, -10, -11]), Some((0, 1, 3)));
         assert_eq!(find_max_subarray(&[]), None);
         assert_eq!(find_max_subarray(&[-1, -2, -3]), Some((0, 0, -1)));
+        assert_eq!(find_max_subarray(&[-10, -2, -1, -3, -10]), Some((2, 2, -1)));
     }
 }
