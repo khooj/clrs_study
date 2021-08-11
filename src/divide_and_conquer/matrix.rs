@@ -78,8 +78,8 @@ mod view {
         }
 
         fn assert_idx(&self, i: usize, j: usize) {
-            let i = self.rows.start + dbg!(i);
-            let j = self.columns.start + dbg!(j);
+            let i = self.rows.start + i;
+            let j = self.columns.start + j;
             if i >= self.rows.end || j >= self.columns.end {
                 panic!(
                     "indexes exceeded: {} > {} or {} > {}",
@@ -97,7 +97,7 @@ mod view {
 
         pub fn set_data(&mut self, i: usize, j: usize, v: i32) {
             self.assert_idx(i, j);
-            self.data.borrow_mut()[i][j] = v;
+            self.data.borrow_mut()[self.rows.start + i][self.columns.start + j] = dbg!(v);
         }
 
         pub fn set_matrix(
@@ -107,30 +107,43 @@ mod view {
             input: &MatrixView<'_, N>,
         ) {
             if rows.end > self.len() {
-                panic!("rows exceed: {:?}", rows);
+                panic!("rows exceed: {:?} > {}", rows, self.len());
             }
 
             if columns.end > self.len() {
-                panic!("columns exceed: {:?}", columns);
+                panic!("columns exceed: {:?} > {}", columns, self.len());
             }
 
-            if rows.end - rows.start != input.len() {
-                panic!("rows exceed input view: {:?}", rows);
+            if rows.len() != input.len() {
+                panic!("rows exceed input view: {:?} != {}", rows, input.len());
             }
 
-            if columns.end - columns.start != input.len() {
-                panic!("columns exceed input view: {:?}", columns);
+            if columns.len() != input.len() {
+                panic!(
+                    "columns exceed input view: {:?} != {}",
+                    columns,
+                    input.len()
+                );
             }
 
             for i in 0..input.len() {
                 for j in 0..input.len() {
-                    self.set_data(i + rows.start, j + columns.start, input.data(i, j));
+                    self.set_data(rows.start + i, columns.start + j, input.data(i, j));
                 }
             }
         }
 
         pub fn set_self_matrix(&mut self, input: &MatrixView<'_, N>) {
-            self.set_matrix(self.rows.clone(), self.columns.clone(), input)
+            self.set_matrix(0..self.len(), 0..self.len(), input);
+        }
+
+        pub fn split_evenly(&self) -> (Self, Self, Self, Self) {
+            let n = self.len();
+            let c11 = MatrixView::from_view(&self, 0..n / 2, 0..n / 2);
+            let c12 = MatrixView::from_view(&self, 0..n / 2, n / 2..n);
+            let c21 = MatrixView::from_view(&self, n / 2..n, 0..n / 2);
+            let c22 = MatrixView::from_view(&self, n / 2..n, n / 2..n);
+            (c11, c12, c21, c22)
         }
     }
 
@@ -177,7 +190,7 @@ impl<const N: usize> Matrix<N> {
         }
     }
 
-    pub fn from_iter<T: Iterator<Item=i32>>(iter: T) -> Self {
+    pub fn from_iter<T: Iterator<Item = i32>>(iter: T) -> Self {
         let size = N;
         let mut data: [[i32; N]; N] = [[0; N]; N];
         let mut i = 0usize;
@@ -185,8 +198,8 @@ impl<const N: usize> Matrix<N> {
         for v in iter {
             data[i][j] = v;
             j += 1;
-            if j >= size && i >= size {
-                break
+            if j + 1 >= size && i + 1 >= size {
+                break;
             }
             if j >= size {
                 i += 1;
@@ -218,49 +231,48 @@ impl<const N: usize> Matrix<N> {
             .collect::<Vec<_>>()
     }
 
-    fn dnc_mul_impl<'a>(
-        c: &mut MatrixView<'a, N>,
-        m: MatrixView<'a, N>,
-        rhs: MatrixView<'a, N>,
-    ) {
+    fn dnc_mul_impl<'a, 'b>(c: &mut MatrixView<'a, N>, m: MatrixView<'a, N>, rhs: MatrixView<'a, N>)
+    where
+        'a: 'b,
+    {
         if c.len() == 1 {
             c.set_data(0, 0, m.data(0, 0) * rhs.data(0, 0));
         } else {
-            let n = c.len();
-            let a11 = MatrixView::from_view(&m, 0..n / 2, 0..n / 2);
-            let a12 = MatrixView::from_view(&m, 0..n / 2, n / 2..n);
-            let a21 = MatrixView::from_view(&m, n / 2..n, 0..n / 2);
-            let a22 = MatrixView::from_view(&m, n / 2..n, n / 2..n);
-            let b11 = MatrixView::from_view(&rhs, 0..n / 2, 0..n / 2);
-            let b12 = MatrixView::from_view(&rhs, 0..n / 2, n / 2..n);
-            let b21 = MatrixView::from_view(&rhs, n / 2..n, 0..n / 2);
-            let b22 = MatrixView::from_view(&rhs, n / 2..n, n / 2..n);
+            let (a11, a12, a21, a22) = m.split_evenly();
+            let (b11, b12, b21, b22) = rhs.split_evenly();
+            let (mut c11, mut c12, mut c21, mut c22) = c.split_evenly();
 
-            let mut c11 = MatrixView::from_view(&rhs, 0..n / 2, 0..n / 2);
-            let mut c12 = MatrixView::from_view(&rhs, 0..n / 2, n / 2..n);
-            let mut c21 = MatrixView::from_view(&rhs, n / 2..n, 0..n / 2);
-            let mut c22 = MatrixView::from_view(&rhs, n / 2..n, n / 2..n);
+            let tmp = Matrix::from_iter(std::iter::repeat(0));
+            let tmp_view = MatrixView::from_matrix(&tmp, 0..tmp.len(), 0..tmp.len());
+            let (mut view1, mut view2, _, _) = tmp_view.split_evenly();
 
-            let tmp1 = Matrix::from_iter(std::iter::repeat(0));
-            let mut tmp1_view = MatrixView::from_matrix(&tmp1, 0..n/2, 0..n/2);
-            let tmp2 = Matrix::from_iter(std::iter::repeat(0));
-            let mut tmp2_view = MatrixView::from_matrix(&tmp2, 0..n/2, 0..n/2);
+            let _func = move |mut v1: &'b mut MatrixView<'a, N>,
+                              mut v2: &'b mut MatrixView<'a, N>,
+                              cc: &'a mut MatrixView<'a, N>,
+                              a1,
+                              b1,
+                              a2,
+                              b2| {
+                Matrix::dnc_mul_impl(&mut v1, a1, b1);
+                Matrix::dnc_mul_impl(&mut v2, a2, b2);
+                cc.set_self_matrix(&(v1.clone() + v2.clone()));
+            };
 
-            Matrix::dnc_mul_impl(&mut tmp1_view, a11.clone(), b11.clone());
-            Matrix::dnc_mul_impl(&mut tmp2_view, a12.clone(), b21.clone());
-            c11.set_self_matrix(&(tmp1_view.clone() + tmp2_view.clone()));
+            Matrix::dnc_mul_impl(&mut view1, a11.clone(), b11.clone());
+            Matrix::dnc_mul_impl(&mut view2, a12.clone(), b21.clone());
+            c11.set_self_matrix(&(view1.clone() + view2.clone()));
 
-            Matrix::dnc_mul_impl(&mut tmp1_view, a11, b12.clone());
-            Matrix::dnc_mul_impl(&mut tmp2_view, a12, b22.clone());
-            c12.set_self_matrix(&(tmp1_view.clone() + tmp2_view.clone()));
+            Matrix::dnc_mul_impl(&mut view1, a11, b12.clone());
+            Matrix::dnc_mul_impl(&mut view2, a12, b22.clone());
+            c12.set_self_matrix(&(view1.clone() + view2.clone()));
 
-            Matrix::dnc_mul_impl(&mut tmp1_view, a21.clone(), b11);
-            Matrix::dnc_mul_impl(&mut tmp2_view, a22.clone(), b21);
-            c21.set_self_matrix(&(tmp1_view.clone() + tmp2_view.clone()));
+            Matrix::dnc_mul_impl(&mut view1, a21.clone(), b11);
+            Matrix::dnc_mul_impl(&mut view2, a22.clone(), b21);
+            c21.set_self_matrix(&(view1.clone() + view2.clone()));
 
-            Matrix::dnc_mul_impl(&mut tmp1_view, a21, b12);
-            Matrix::dnc_mul_impl(&mut tmp2_view, a22, b22);
-            c22.set_self_matrix(&(tmp1_view + tmp2_view));
+            Matrix::dnc_mul_impl(&mut view1, a21, b12);
+            Matrix::dnc_mul_impl(&mut view2, a22, b22);
+            c22.set_self_matrix(&(view1 + view2));
         }
     }
 
@@ -284,14 +296,30 @@ mod tests {
 
     #[test]
     fn check_matrix_ops() {
-        let a = Matrix::new([[1, 2], [3, 4]]);
-        let b = Matrix::new([[1, 2], [3, 4]]);
+        let a = Matrix::new([[1, 2, 3, 4], [1, 2, 3, 4], [1, 2, 3, 4], [1, 2, 3, 4]]);
+        let b = a.clone();
 
         let res = a.clone().mul(b.clone());
-        assert_eq!(res.data.borrow().as_ref(), &[[7, 10], [15, 22]]);
+        assert_eq!(
+            res.data.borrow().as_ref(),
+            &[
+                [10, 20, 30, 40],
+                [10, 20, 30, 40],
+                [10, 20, 30, 40],
+                [10, 20, 30, 40]
+            ]
+        );
 
         let res = a.dnc_mul(&b);
-        assert_eq!(res.data.borrow().as_ref(), &[[7, 10], [15, 22]]);
+        assert_eq!(
+            res.data.borrow().as_ref(),
+            &[
+                [10, 20, 30, 40],
+                [10, 20, 30, 40],
+                [10, 20, 30, 40],
+                [10, 20, 30, 40]
+            ]
+        );
     }
 
     #[test]
