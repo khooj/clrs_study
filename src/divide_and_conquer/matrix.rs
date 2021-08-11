@@ -59,6 +59,7 @@ mod view {
             }
         }
 
+        #[cfg(test)]
         pub fn inner_cloned(&self) -> Vec<Vec<i32>> {
             self.data.borrow()[self.rows.start..self.rows.end]
                 .iter()
@@ -176,7 +177,8 @@ impl<const N: usize> Matrix<N> {
         }
     }
 
-    pub fn from_iter<T: Iterator<Item=i32>>(iter: T, size: usize) -> Self {
+    pub fn from_iter<T: Iterator<Item=i32>>(iter: T) -> Self {
+        let size = N;
         let mut data: [[i32; N]; N] = [[0; N]; N];
         let mut i = 0usize;
         let mut j = 0usize;
@@ -239,9 +241,9 @@ impl<const N: usize> Matrix<N> {
             let mut c21 = MatrixView::from_view(&rhs, n / 2..n, 0..n / 2);
             let mut c22 = MatrixView::from_view(&rhs, n / 2..n, n / 2..n);
 
-            let mut tmp1 = Matrix::from_iter(std::iter::repeat(0), n/2);
+            let tmp1 = Matrix::from_iter(std::iter::repeat(0));
             let mut tmp1_view = MatrixView::from_matrix(&tmp1, 0..n/2, 0..n/2);
-            let mut tmp2 = Matrix::from_iter(std::iter::repeat(0), n/2);
+            let tmp2 = Matrix::from_iter(std::iter::repeat(0));
             let mut tmp2_view = MatrixView::from_matrix(&tmp2, 0..n/2, 0..n/2);
 
             Matrix::dnc_mul_impl(&mut tmp1_view, a11.clone(), b11.clone());
@@ -265,7 +267,7 @@ impl<const N: usize> Matrix<N> {
     pub fn dnc_mul(&self, input: &Matrix<N>) -> Matrix<N> {
         let view1 = MatrixView::from_matrix(&self, 0..self.len(), 0..self.len());
         let view2 = MatrixView::from_matrix(input, 0..input.len(), 0..input.len());
-        let c = Matrix::from_iter(std::iter::repeat(0), self.len());
+        let c = Matrix::from_iter(std::iter::repeat(0));
         let mut c_view = MatrixView::from_matrix(&c, 0..c.len(), 0..c.len());
         Matrix::dnc_mul_impl(&mut c_view, view1, view2);
         c
