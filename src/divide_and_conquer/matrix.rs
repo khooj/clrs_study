@@ -1,4 +1,5 @@
 use std::cell::RefCell;
+use std::ops::Range;
 
 type InnerData<const N: usize> = [[i32; N]; N];
 
@@ -19,8 +20,8 @@ mod view {
     pub struct MatrixView<'a, const N: usize> {
         // probably need smth like &[&[i32]], but i struggle to construct it
         data: &'a RefCell<InnerData<N>>,
-        rows: Range<usize>,
-        columns: Range<usize>,
+        pub rows: Range<usize>,
+        pub columns: Range<usize>,
     }
 
     impl<'a, const N: usize> MatrixView<'a, N> {
@@ -97,7 +98,7 @@ mod view {
 
         pub fn set_data(&mut self, i: usize, j: usize, v: i32) {
             self.assert_idx(i, j);
-            self.data.borrow_mut()[self.rows.start + i][self.columns.start + j] = dbg!(v);
+            self.data.borrow_mut()[self.rows.start + i][self.columns.start + j] = v;
         }
 
         pub fn set_matrix(
@@ -139,10 +140,14 @@ mod view {
 
         pub fn split_evenly(&self) -> (Self, Self, Self, Self) {
             let n = self.len();
-            let c11 = MatrixView::from_view(&self, 0..n / 2, 0..n / 2);
-            let c12 = MatrixView::from_view(&self, 0..n / 2, n / 2..n);
-            let c21 = MatrixView::from_view(&self, n / 2..n, 0..n / 2);
-            let c22 = MatrixView::from_view(&self, n / 2..n, n / 2..n);
+            let rows1 = self.rows.start..self.rows.start + n / 2;
+            let rows2 = self.rows.start + n / 2..self.rows.end;
+            let columns1 = self.columns.start..self.columns.start + n / 2;
+            let columns2 = self.columns.start + n / 2..self.columns.end;
+            let c11 = MatrixView::from_view(&self, rows1.clone(), columns1.clone());
+            let c12 = MatrixView::from_view(&self, rows1.clone(), columns2.clone());
+            let c21 = MatrixView::from_view(&self, rows2.clone(), columns1);
+            let c22 = MatrixView::from_view(&self, rows2, columns2);
             (c11, c12, c21, c22)
         }
     }
@@ -156,7 +161,7 @@ mod view {
             for i in 0..len {
                 for j in 0..len {
                     let v = rhs.data(i, j);
-                    m.set_data(i, j, dbg!(m.data(i, j)) + dbg!(v));
+                    m.set_data(i, j, m.data(i, j) + v);
                 }
             }
 
@@ -179,9 +184,36 @@ mod view {
             m
         }
     }
+
+    impl<const N: usize> std::fmt::Display for MatrixView<'_, N> {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            write!(f, "[")?;
+            for i in 0..self.len() {
+                write!(f, "[")?;
+                for j in 0..self.len() {
+                    write!(f, "{},", self.data(i, j))?;
+                }
+                write!(f, "],")?;
+            }
+            Ok(())
+        }
+    }
 }
 
 use view::MatrixView;
+
+struct BoxedMatrixWithView<const N: usize> {
+    matrix: Matrix<N>,
+    rows: Range<usize>,
+    columns: Range<usize>,
+}
+
+impl<const N: usize> BoxedMatrixWithView<N> {
+    fn view<'a>(&'a self) -> MatrixView<'a, N> {
+        self.matrix
+            .view_range(self.rows.clone(), self.columns.clone())
+    }
+}
 
 impl<const N: usize> Matrix<N> {
     pub fn new(input: [[i32; N]; N]) -> Self {
@@ -210,6 +242,14 @@ impl<const N: usize> Matrix<N> {
         Matrix::new(data)
     }
 
+    pub fn view(&self) -> MatrixView<'_, N> {
+        MatrixView::from_matrix(&self, 0..self.len(), 0..self.len())
+    }
+
+    pub fn view_range(&self, rows: Range<usize>, columns: Range<usize>) -> MatrixView<'_, N> {
+        MatrixView::from_matrix(&self, rows, columns)
+    }
+
     pub fn mul(self, rhs: Matrix<N>) -> Matrix<N> {
         let mut m = Matrix::new([[0; N]; N]);
         for i in 0..N {
@@ -223,6 +263,7 @@ impl<const N: usize> Matrix<N> {
         m
     }
 
+    #[cfg(test)]
     pub fn inner_cloned(&self) -> Vec<Vec<i32>> {
         self.data
             .borrow()
@@ -231,58 +272,45 @@ impl<const N: usize> Matrix<N> {
             .collect::<Vec<_>>()
     }
 
-    fn dnc_mul_impl<'a, 'b>(c: &mut MatrixView<'a, N>, m: MatrixView<'a, N>, rhs: MatrixView<'a, N>)
+    fn dnc_mul_impl<'a, 'b>(m: MatrixView<'a, N>, rhs: MatrixView<'a, N>) -> BoxedMatrixWithView<N>
     where
-        'a: 'b,
+        'b: 'a,
     {
-        if c.len() == 1 {
-            c.set_data(0, 0, m.data(0, 0) * rhs.data(0, 0));
+        let c = Matrix::from_iter(std::iter::repeat(0));
+        let mut c_view = c.view_range(0..m.len(), 0..m.len());
+
+        if c_view.len() == 1 {
+            c_view.set_data(0, 0, m.data(0, 0) * rhs.data(0, 0));
         } else {
             let (a11, a12, a21, a22) = m.split_evenly();
             let (b11, b12, b21, b22) = rhs.split_evenly();
-            let (mut c11, mut c12, mut c21, mut c22) = c.split_evenly();
+            let (mut c11, mut c12, mut c21, mut c22) = c_view.split_evenly();
 
-            let tmp = Matrix::from_iter(std::iter::repeat(0));
-            let tmp_view = MatrixView::from_matrix(&tmp, 0..tmp.len(), 0..tmp.len());
-            let (mut view1, mut view2, _, _) = tmp_view.split_evenly();
-
-            let _func = move |mut v1: &'b mut MatrixView<'a, N>,
-                              mut v2: &'b mut MatrixView<'a, N>,
-                              cc: &'a mut MatrixView<'a, N>,
-                              a1,
-                              b1,
-                              a2,
-                              b2| {
-                Matrix::dnc_mul_impl(&mut v1, a1, b1);
-                Matrix::dnc_mul_impl(&mut v2, a2, b2);
-                cc.set_self_matrix(&(v1.clone() + v2.clone()));
+            let func = |a1, b1, a2, b2| {
+                let c1 = Matrix::dnc_mul_impl(a1, b1);
+                let c2 = Matrix::dnc_mul_impl(a2, b2);
+                let _ = c1.view() + c2.view();
+                c1
             };
 
-            Matrix::dnc_mul_impl(&mut view1, a11.clone(), b11.clone());
-            Matrix::dnc_mul_impl(&mut view2, a12.clone(), b21.clone());
-            c11.set_self_matrix(&(view1.clone() + view2.clone()));
+            c11.set_self_matrix(&func(a11.clone(), b11.clone(), a12.clone(), b21.clone()).view());
+            c12.set_self_matrix(&func(a11, b12.clone(), a12, b22.clone()).view());
+            c21.set_self_matrix(&func(a21.clone(), b11, a22.clone(), b21).view());
+            c22.set_self_matrix(&func(a21, b12, a22, b22).view());
+        }
 
-            Matrix::dnc_mul_impl(&mut view1, a11, b12.clone());
-            Matrix::dnc_mul_impl(&mut view2, a12, b22.clone());
-            c12.set_self_matrix(&(view1.clone() + view2.clone()));
-
-            Matrix::dnc_mul_impl(&mut view1, a21.clone(), b11);
-            Matrix::dnc_mul_impl(&mut view2, a22.clone(), b21);
-            c21.set_self_matrix(&(view1.clone() + view2.clone()));
-
-            Matrix::dnc_mul_impl(&mut view1, a21, b12);
-            Matrix::dnc_mul_impl(&mut view2, a22, b22);
-            c22.set_self_matrix(&(view1 + view2));
+        BoxedMatrixWithView {
+            matrix: c,
+            rows: 0..m.len(),
+            columns: 0..m.len(),
         }
     }
 
     pub fn dnc_mul(&self, input: &Matrix<N>) -> Matrix<N> {
-        let view1 = MatrixView::from_matrix(&self, 0..self.len(), 0..self.len());
-        let view2 = MatrixView::from_matrix(input, 0..input.len(), 0..input.len());
-        let c = Matrix::from_iter(std::iter::repeat(0));
-        let mut c_view = MatrixView::from_matrix(&c, 0..c.len(), 0..c.len());
-        Matrix::dnc_mul_impl(&mut c_view, view1, view2);
-        c
+        let view1 = self.view();
+        let view2 = input.view();
+        let c = Matrix::dnc_mul_impl(view1, view2);
+        c.matrix
     }
 
     pub fn len(&self) -> usize {
@@ -293,6 +321,23 @@ impl<const N: usize> Matrix<N> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn check_range_len() {
+        assert_eq!((0..4).len(), 4);
+    }
+
+    #[test]
+    fn check_matrix_ops_simple() {
+        let a = Matrix::new([[1, 2], [3, 4]]);
+        let b = Matrix::new([[1, 2], [3, 4]]);
+
+        let res = a.clone().mul(b.clone());
+        assert_eq!(res.data.borrow().as_ref(), &[[7, 10], [15, 22]]);
+
+        let res = a.dnc_mul(&b);
+        assert_eq!(res.data.borrow().as_ref(), &[[7, 10], [15, 22]]);
+    }
 
     #[test]
     fn check_matrix_ops() {
@@ -346,5 +391,26 @@ mod tests {
         let mut view = MatrixView::from_matrix(&a, 0..2, 0..2);
         view.set_matrix(1..2, 0..1, &view1);
         assert_eq!(view.inner_cloned(), [[4, 2], [4, 4]]);
+
+        let a = Matrix::new([[1, 2, 3, 4], [1, 2, 3, 4], [1, 2, 3, 4], [1, 2, 3, 4]]);
+        let view = a.view();
+
+        let (v1, v2, v3, v4) = view.split_evenly();
+        assert_eq!(v1.inner_cloned(), [[1, 2], [1, 2]]);
+        assert_eq!(v2.inner_cloned(), [[3, 4], [3, 4]]);
+        assert_eq!(v3.inner_cloned(), [[1, 2], [1, 2]]);
+        assert_eq!(v4.inner_cloned(), [[3, 4], [3, 4]]);
+
+        let (v11, v12, v13, v14) = v1.split_evenly();
+        assert_eq!(v11.inner_cloned(), [[1]]);
+        assert_eq!(v12.inner_cloned(), [[2]]);
+        assert_eq!(v13.inner_cloned(), [[1]]);
+        assert_eq!(v14.inner_cloned(), [[2]]);
+
+        let (v41, v42, v43, v44) = v4.split_evenly();
+        assert_eq!(v41.inner_cloned(), [[3]]);
+        assert_eq!(v42.inner_cloned(), [[4]]);
+        assert_eq!(v43.inner_cloned(), [[3]]);
+        assert_eq!(v44.inner_cloned(), [[4]]);
     }
 }
