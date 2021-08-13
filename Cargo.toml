@@ -14,3 +14,7 @@ rand = "0.8"
 [[bench]]
 name = "sorts"
 harness = false
+
+[[bench]]
+name = "matrices"
+harness = false
