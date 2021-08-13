@@ -162,7 +162,7 @@ mod view {
                 }
                 write!(f, "],")?;
             }
-            Ok(())
+            write!(f, "]")
         }
     }
 
@@ -170,7 +170,7 @@ mod view {
         type Output = BoxedMatrixWithView<N>;
 
         fn add(self, rhs: MatrixView<'a, N>) -> Self::Output {
-            let result = Matrix::from_iter(std::iter::repeat(0));
+            let result = Matrix::zeros();
             let mut m = result.view_range(0..self.len(), 0..self.len());
             let len = m.len();
             for i in 0..len {
@@ -182,8 +182,8 @@ mod view {
 
             BoxedMatrixWithView {
                 matrix: result,
-                rows: self.rows,
-                columns: self.columns,
+                rows: 0..self.len(),
+                columns: 0..self.len(),
             }
         }
     }
@@ -192,7 +192,7 @@ mod view {
         type Output = BoxedMatrixWithView<N>;
 
         fn sub(self, rhs: MatrixView<'a, N>) -> Self::Output {
-            let result = Matrix::from_iter(std::iter::repeat(0));
+            let result = Matrix::zeros();
             let mut m = result.view_range(0..self.len(), 0..self.len());
             let len = m.len();
             for i in 0..len {
@@ -203,8 +203,8 @@ mod view {
 
             BoxedMatrixWithView {
                 matrix: result,
-                rows: self.rows,
-                columns: self.columns,
+                rows: 0..self.len(),
+                columns: 0..self.len(),
             }
         }
     }
@@ -275,6 +275,10 @@ impl<const N: usize> Matrix<N> {
         Matrix::new(data)
     }
 
+    pub fn zeros() -> Self {
+        Matrix::from_iter(std::iter::repeat(0))
+    }
+
     pub fn view(&self) -> MatrixView<'_, N> {
         MatrixView::from_matrix(&self, 0..self.len(), 0..self.len())
     }
@@ -309,7 +313,7 @@ impl<const N: usize> Matrix<N> {
     where
         'b: 'a,
     {
-        let c = Matrix::from_iter(std::iter::repeat(0));
+        let c = Matrix::zeros();
         let mut c_view = c.view_range(0..m.len(), 0..m.len());
 
         if c_view.len() == 1 {
@@ -349,16 +353,11 @@ impl<const N: usize> Matrix<N> {
         m: MatrixView<'a, N>,
         rhs: MatrixView<'a, N>,
     ) -> BoxedMatrixWithView<N> {
-        let c = Matrix::from_iter(std::iter::repeat(0));
+        let c = Matrix::zeros();
         let mut c_view = c.view_range(0..m.len(), 0..m.len());
-
-        println!("c before {}", c_view);
-        println!("m before {}", m);
-        println!("rhs before {}", rhs);
 
         if c_view.len() == 1 {
             c_view.set_data(0, 0, m.data(0, 0) * rhs.data(0, 0));
-            println!("c after one {}", c_view);
             return BoxedMatrixWithView {
                 matrix: c,
                 rows: 0..m.len(),
@@ -370,31 +369,29 @@ impl<const N: usize> Matrix<N> {
         let (b11, b12, b21, b22) = rhs.split_evenly();
         let (mut c11, mut c12, mut c21, mut c22) = c_view.split_evenly();
 
-        let s1 = b12.clone() - b22.clone(); // 2-4=-2
-        let s2 = a11.clone() + a12.clone(); // 1+2=3
-        let s3 = a21.clone() + a22.clone(); // 3+4=7
-        let s4 = b21.clone() - b11.clone(); // 3-1=2
-        let s5 = a11.clone() + a22.clone(); // 1+4=5
-        let s6 = b11.clone() + b22.clone(); // 1+4=5
-        let s7 = a12 - a22.clone(); //2-4=-2
-        let s8 = b21 + b22.clone(); //3+4=7
-        let s9 = a11.clone() - a21; //1-3=-2
-        let s10 = b11.clone() + b12; //1+2=3
+        let s1 = b12.clone() - b22.clone();
+        let s2 = a11.clone() + a12.clone();
+        let s3 = a21.clone() + a22.clone();
+        let s4 = b21.clone() - b11.clone();
+        let s5 = a11.clone() + a22.clone();
+        let s6 = b11.clone() + b22.clone();
+        let s7 = a12 - a22.clone();
+        let s8 = b21 + b22.clone();
+        let s9 = a11.clone() - a21;
+        let s10 = b11.clone() + b12;
 
-        let p1 = Matrix::strassen_mul_impl(a11, s1.view()); // 1*-2=-2
-        let p2 = Matrix::strassen_mul_impl(s2.view(), b22); // 3*4=12
-        let p3 = Matrix::strassen_mul_impl(s3.view(), b11); //7*1=1
-        let p4 = Matrix::strassen_mul_impl(a22, s4.view()); //4*2=8
-        let p5 = Matrix::strassen_mul_impl(s5.view(), s6.view()); // 5*5=25
-        let p6 = Matrix::strassen_mul_impl(s7.view(), s8.view()); // -2*7=-14
-        let p7 = Matrix::strassen_mul_impl(s9.view(), s10.view()); // -2*3=-6
+        let p1 = Matrix::strassen_mul_impl(a11, s1.view());
+        let p2 = Matrix::strassen_mul_impl(s2.view(), b22);
+        let p3 = Matrix::strassen_mul_impl(s3.view(), b11);
+        let p4 = Matrix::strassen_mul_impl(a22, s4.view());
+        let p5 = Matrix::strassen_mul_impl(s5.view(), s6.view());
+        let p6 = Matrix::strassen_mul_impl(s7.view(), s8.view());
+        let p7 = Matrix::strassen_mul_impl(s9.view(), s10.view());
 
-        c11.set_self_matrix(&(p5.clone() + p4.clone() - p2.clone() + p6).view()); // 25+8-12+(-14)=7
-        c12.set_self_matrix(&(p1.clone() + p2).view()); // -2+12=10
-        c21.set_self_matrix(&(p3.clone() + p4).view()); // 1+8=9
-        c22.set_self_matrix(&(p5 + p1 - p3 - p7).view()); // 25+(-2)-1-(-6)=28
-
-        println!("c after {}", c_view);
+        c11.set_self_matrix(&(p5.clone() + p4.clone() - p2.clone() + p6).view());
+        c12.set_self_matrix(&(p1.clone() + p2).view());
+        c21.set_self_matrix(&(p3.clone() + p4).view());
+        c22.set_self_matrix(&(p5 + p1 - p3 - p7).view());
 
         BoxedMatrixWithView {
             matrix: c,
@@ -414,14 +411,6 @@ impl<const N: usize> Matrix<N> {
         self.data.borrow().len()
     }
 }
-
-// impl<'a, const N: usize> std::ops::Add<MatrixView<'a, N>> for Matrix<N> {
-//     type Output = Matrix<N>;
-
-//     fn add(self, rhs: MatrixView<'a, N>) -> Self::Output {
-//         self.view
-//     }
-// }
 
 #[cfg(test)]
 mod tests {
@@ -496,11 +485,11 @@ mod tests {
         assert_eq!(view2.inner_cloned(), [[4]]);
 
         let view = view1.clone().add(view2.clone());
-        assert_eq!(view.view().inner_cloned(), [[5, 0], [0, 0]]);
+        assert_eq!(view.view().inner_cloned(), [[5]]);
         assert_eq!(a.inner_cloned(), [[1, 2], [3, 4]]);
 
         let view = view1.clone().sub(view2.clone());
-        assert_eq!(view.view().inner_cloned(), [[-3, 0], [0, 0]]);
+        assert_eq!(view.view().inner_cloned(), [[-3]]);
 
         view1.set_self_matrix(&view2);
         assert_eq!(view1.inner_cloned(), [[4]]);
